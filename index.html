@@ -157,37 +157,53 @@
 
 <script>
 /* ---------------------------------------------------------
-   AUTO-DETECT FACEBOOK LIVESTREAM
+   AUTO-DETECT NEWEST LIVESTREAM BY SCRAPING PUBLIC VIDEOS
    --------------------------------------------------------- */
 
-const PAGE_ID = "djptacek";  // Your Facebook username/page
+const VIDEO_FEED_URL = "https://www.facebook.com/djptacek/videos/";
 const CHECK_INTERVAL = 60000; // 1 minute
 
-async function checkLiveStatus() {
+async function findLatestVideoURL() {
     try {
-        const response = await fetch(`https://graph.facebook.com/${PAGE_ID}/live_videos?fields=status,embed_html&access_token=`);
-        
-        // NOTE: No token required for public pages, FB returns limited fields
-        const data = await response.json();
+        const response = await fetch(VIDEO_FEED_URL, { mode: "cors" });
+        const html = await response.text();
 
-        if (!data.data || data.data.length === 0) {
-            retry();
-            return;
+        // Look for the first video link
+        const match = html.match(/https:\/\/www\.facebook\.com\/djptacek\/videos\/(\d+)\//);
+
+        if (match && match[0]) {
+            return match[0];
         }
-
-        const liveVideo = data.data.find(v => v.status === "LIVE");
-
-        if (!liveVideo) {
-            retry();
-            return;
-        }
-
-        // SUCCESS — livestream is active
-        activateLiveStream(liveVideo.embed_html);
-
-    } catch (err) {
-        retry();
+    } catch (e) {
+        console.log("Error fetching video feed", e);
     }
+    return null;
+}
+
+async function checkIfLive() {
+    const videoURL = await findLatestVideoURL();
+
+    if (!videoURL) {
+        retry();
+        return;
+    }
+
+    // Update embed target
+    const embed = document.getElementById("fb-live-video");
+    embed.setAttribute("data-href", videoURL);
+
+    // Re-render embed
+    if (window.FB) FB.XFBML.parse();
+
+    setTimeout(() => {
+        const iframe = document.querySelector(".fb-video iframe");
+
+        if (iframe) {
+            activateLiveStream();
+        } else {
+            retry();
+        }
+    }, 2500);
 }
 
 function retry() {
@@ -196,29 +212,22 @@ function retry() {
         <h3>Livestream Offline</h3>
         <p style='color:#aaa; margin-top:8px;'>Retrying every minute…</p>
     `;
-    setTimeout(checkLiveStatus, CHECK_INTERVAL);
+    setTimeout(checkIfLive, CHECK_INTERVAL);
 }
 
-function activateLiveStream(embedHTML) {
-    // Stop retry loop
+function activateLiveStream() {
     document.getElementById("stream-status").style.display = "none";
-
-    // Insert Facebook embed HTML
-    document.getElementById("fb-live-video").innerHTML = embedHTML;
-
-    // Show video
     document.getElementById("video-content").style.display = "block";
 
     // Show map + split layout
     document.getElementById("map-panel").style.display = "flex";
     document.getElementById("dashboard").classList.add("live-active");
-
-    // Parse FB embed
-    if (window.FB) FB.XFBML.parse();
 }
 
-// Start checking immediately
-checkLiveStatus();
+window.fbAsyncInit = function() {
+    FB.init({ xfbml: true, version: 'v18.0' });
+    checkIfLive();
+};
 </script>
 
 </body>
