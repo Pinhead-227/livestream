@@ -63,30 +63,6 @@
             flex-grow: 1;
         }
 
-        .video-error-msg {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 20px;
-            background-color: #151515;
-            z-index: 10;
-        }
-
-        .spinner {
-            border: 4px solid rgba(255,255,255,0.1);
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            border-left-color: #1877f2;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
         .video-wrapper {
             width: 100%;
             height: 100%;
@@ -100,12 +76,38 @@
             flex-grow: 1;
         }
 
-        @media (max-width: 768px) {
-            .dashboard-container.live-active {
-                grid-template-columns: 1fr;
-                grid-template-rows: 1fr 1fr;
-                overflow-y: auto;
-            }
+        #urlPrompt {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #urlPrompt input {
+            width: 80%;
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            margin-top: 10px;
+            font-size: 1rem;
+        }
+
+        #urlPrompt button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 6px;
+            background: #1877f2;
+            color: white;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -119,10 +121,10 @@
 
     <div id="dashboard" class="dashboard-container">
 
-        <!-- Map Panel (Hidden until livestream starts) -->
+        <!-- Traccar Live GPS Panel -->
         <div id="map-panel" class="panel">
-            <div class="panel-header">� Shared Location</div>
-            <iframe src="YOUR_GOOGLE_MY_MAPS_EMBED_URL"></iframe>
+            <div class="panel-header">� Live GPS Location (Traccar)</div>
+            <iframe src="https://demo4.traccar.org/?deviceId=28835839"></iframe>
         </div>
 
         <!-- Video Panel -->
@@ -131,13 +133,14 @@
 
             <div class="video-container">
 
-                <!-- Waiting Screen -->
-                <div id="stream-status" class="video-error-msg">
-                    <div class="spinner"></div>
-                    <h3>Waiting for livestream…</h3>
-                    <p style="color:#aaa; font-size:0.9rem; margin-top:8px;">
-                        Checking automatically every minute.
+                <!-- URL Prompt -->
+                <div id="urlPrompt">
+                    <h2>Paste your Facebook livestream URL</h2>
+                    <p style="color:#aaa; margin-top:8px;">
+                        Example: https://www.facebook.com/yourname/videos/123456789012345/
                     </p>
+                    <input id="streamURL" type="text" placeholder="Paste livestream URL here">
+                    <button onclick="loadStream()">Load Stream</button>
                 </div>
 
                 <!-- Video -->
@@ -156,77 +159,28 @@
     </div>
 
 <script>
-/* ---------------------------------------------------------
-   AUTO-DETECT NEWEST LIVESTREAM BY SCRAPING PUBLIC VIDEOS
-   --------------------------------------------------------- */
+function loadStream() {
+    const url = document.getElementById("streamURL").value.trim();
+    if (!url.includes("facebook.com")) return alert("Please paste a valid Facebook video URL.");
 
-const VIDEO_FEED_URL = "https://www.facebook.com/djptacek/videos/";
-const CHECK_INTERVAL = 60000; // 1 minute
-
-async function findLatestVideoURL() {
-    try {
-        const response = await fetch(VIDEO_FEED_URL, { mode: "cors" });
-        const html = await response.text();
-
-        // Look for the first video link
-        const match = html.match(/https:\/\/www\.facebook\.com\/djptacek\/videos\/(\d+)\//);
-
-        if (match && match[0]) {
-            return match[0];
-        }
-    } catch (e) {
-        console.log("Error fetching video feed", e);
-    }
-    return null;
-}
-
-async function checkIfLive() {
-    const videoURL = await findLatestVideoURL();
-
-    if (!videoURL) {
-        retry();
-        return;
-    }
-
-    // Update embed target
+    // Set embed target
     const embed = document.getElementById("fb-live-video");
-    embed.setAttribute("data-href", videoURL);
+    embed.setAttribute("data-href", url);
 
-    // Re-render embed
-    if (window.FB) FB.XFBML.parse();
-
-    setTimeout(() => {
-        const iframe = document.querySelector(".fb-video iframe");
-
-        if (iframe) {
-            activateLiveStream();
-        } else {
-            retry();
-        }
-    }, 2500);
-}
-
-function retry() {
-    document.getElementById("stream-status").innerHTML = `
-        <div class="spinner"></div>
-        <h3>Livestream Offline</h3>
-        <p style='color:#aaa; margin-top:8px;'>Retrying every minute…</p>
-    `;
-    setTimeout(checkIfLive, CHECK_INTERVAL);
-}
-
-function activateLiveStream() {
-    document.getElementById("stream-status").style.display = "none";
+    // Hide prompt, show video
+    document.getElementById("urlPrompt").style.display = "none";
     document.getElementById("video-content").style.display = "block";
 
-    // Show map + split layout
+    // Show Traccar map + split layout
     document.getElementById("map-panel").style.display = "flex";
     document.getElementById("dashboard").classList.add("live-active");
+
+    // Render FB embed
+    if (window.FB) FB.XFBML.parse();
 }
 
 window.fbAsyncInit = function() {
     FB.init({ xfbml: true, version: 'v18.0' });
-    checkIfLive();
 };
 </script>
 
